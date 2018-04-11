@@ -24,9 +24,6 @@ public class MainActivity extends AppCompatActivity {
     Criteria criteria;
     Location lastKnownLocation;
 
-    Location mPointA;
-    Location mPointB;
-
     float mTotalDistance = 0;
     boolean mRunning;
     float mAvgSpeed;
@@ -60,11 +57,11 @@ public class MainActivity extends AppCompatActivity {
         locationListener = new LocationListener() {
             @Override
             public void onLocationChanged(Location location) {
-                mPointA = mPointB;
-                mPointB = location;
-                mTotalDistance += mPointA.distanceTo(mPointB);
-                Log.d("LCT", "Distância total: " + String.valueOf(mTotalDistance));
-                mTextView.setText(String.format("%sm", String.valueOf((int) mTotalDistance)));
+                if (mRunning) {
+                    mTotalDistance += lastKnownLocation.distanceTo(location);
+                    Log.d("LCT", "Distância total: " + String.valueOf(mTotalDistance));
+                    mTextView.setText(String.format("%sm", String.valueOf((int) mTotalDistance)));
+                }
             }
 
             @Override
@@ -89,8 +86,6 @@ public class MainActivity extends AppCompatActivity {
         };
 
         lastKnownLocation = locationManager.getLastKnownLocation(locationProvider);
-        mPointA = lastKnownLocation;
-        mPointB = mPointA;
         locationManager.requestLocationUpdates(locationProvider, 0, 0, locationListener);
 
         mButton.setOnClickListener(new View.OnClickListener() {
@@ -103,15 +98,16 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     mChronometer.stop();
                     mTotalDistance = 0;
-                    mPointA = null;
-                    mPointB = null;
+                    mTextView.setText(String.format("%sm", String.valueOf((int) mTotalDistance)));
                     mButton.setText(R.string.go);
                 }
                 mRunning = !mRunning;
             }
         });
 
-        //TODO: Create timed logic for speed and distance calculations.
+        //TODO: Speed calculation.
+
+        //TODO: Sharing.
 
     }
 }
