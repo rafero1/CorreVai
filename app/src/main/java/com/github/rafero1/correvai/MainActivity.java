@@ -20,19 +20,19 @@ import android.widget.TextView;
 public class MainActivity extends AppCompatActivity {
     LocationManager locationManager;
     LocationListener locationListener;
+    String locationProvider;
+    Criteria criteria;
+    Location lastKnownLocation;
 
-    Location mStartLocation;
     Location mPointA;
     Location mPointB;
-    Location mEndLocation;
 
     float mTotalDistance = 0;
-
+    boolean mRunning;
     float mAvgSpeed;
     float mTime;
 
     TextView mTextView;
-    boolean mRunning = false;
     Chronometer mChronometer;
     Button mButton;
 
@@ -40,18 +40,22 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 0);
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, 0);
         }
 
-        locationManager = (LocationManager)getSystemService(Context.LOCATION_SERVICE);
+        mTextView = (TextView) findViewById(R.id.textView);
+        mChronometer = (Chronometer) findViewById(R.id.chronometer2);
+        mButton = (Button) findViewById(R.id.button);
+        mRunning = false;
+
+
+        criteria = new Criteria();
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        if (locationManager != null)
+            locationProvider = locationManager.getBestProvider(criteria, true);
 
         locationListener = new LocationListener() {
             @Override
@@ -59,13 +63,18 @@ public class MainActivity extends AppCompatActivity {
                 mPointA = mPointB;
                 mPointB = location;
                 mTotalDistance += mPointA.distanceTo(mPointB);
-                Log.d("LCT", "Distância total: "+String.valueOf(mTotalDistance));
-                mTextView.setText("Distância total: "+String.valueOf(mTotalDistance));
+                Log.d("LCT", "Distância total: " + String.valueOf(mTotalDistance));
+                mTextView.setText(String.format("%sm", String.valueOf((int) mTotalDistance)));
             }
 
             @Override
             public void onStatusChanged(String s, int i, Bundle bundle) {
-                //
+                locationProvider = locationManager.getBestProvider(criteria, true);
+                if (ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                        && ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    return;
+                }
+                lastKnownLocation = locationManager.getLastKnownLocation(locationProvider);
             }
 
             @Override
@@ -78,21 +87,11 @@ public class MainActivity extends AppCompatActivity {
                 //
             }
         };
-        Criteria criteria = new Criteria();
 
-        String locationProvider = LocationManager.GPS_PROVIDER;
-        locationProvider = locationManager.getBestProvider(criteria, true);
-        Location lastKnownLocation = locationManager.getLastKnownLocation(locationProvider);
-
-        locationManager.requestLocationUpdates(locationProvider, 0, 0, locationListener);
-
-        mStartLocation = lastKnownLocation;
-        mPointA = mStartLocation;
+        lastKnownLocation = locationManager.getLastKnownLocation(locationProvider);
+        mPointA = lastKnownLocation;
         mPointB = mPointA;
-
-        mTextView = (TextView) findViewById(R.id.textView);
-        mChronometer = (Chronometer) findViewById(R.id.chronometer2);
-        mButton = (Button) findViewById(R.id.button);
+        locationManager.requestLocationUpdates(locationProvider, 0, 0, locationListener);
 
         mButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -100,11 +99,13 @@ public class MainActivity extends AppCompatActivity {
                 if (!mRunning) {
                     mChronometer.setBase(SystemClock.elapsedRealtime());
                     mChronometer.start();
-                    mButton.setText("Parar");
+                    mButton.setText(R.string.stop);
                 } else {
                     mChronometer.stop();
                     mTotalDistance = 0;
-                    mButton.setText("Correr");
+                    mPointA = null;
+                    mPointB = null;
+                    mButton.setText(R.string.go);
                 }
                 mRunning = !mRunning;
             }

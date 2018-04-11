@@ -1,3 +1,5 @@
 <resources>
-    <string name="app_name">Corre Vai</string>
+    <string name="app_name">1, 2, 3, Vai!</string>
+    <string name="go">Vai!</string>
+    <string name="stop">Parar!</string>
 </resources>
