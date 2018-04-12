@@ -29,10 +29,11 @@ public class MainActivity extends AppCompatActivity {
 
     float mTotalDistance = 0;
     boolean mRunning = false;
+    float mWalkedDistance = 0;
     float mAvgSpeed;
-    float mTime;
 
     TextView mDistanceView;
+    TextView mSpeedView;
     Chronometer mChronometer;
     Button mButton;
     ImageButton mShareButton;
@@ -48,6 +49,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         mDistanceView = (TextView) findViewById(R.id.distanceView);
+        mSpeedView = (TextView) findViewById(R.id.speedView);
         mChronometer = (Chronometer) findViewById(R.id.chronometer);
         mButton = (Button) findViewById(R.id.button);
         mShareButton = (ImageButton) findViewById(R.id.shareButton);
@@ -62,7 +64,8 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onLocationChanged(Location location) {
                 if (mRunning) {
-                    mTotalDistance += lastKnownLocation.distanceTo(location);
+                    mWalkedDistance = lastKnownLocation.distanceTo(location);
+                    mTotalDistance += mWalkedDistance;
                     Log.d("LCT", "Distância total: " + String.valueOf(mTotalDistance));
                     mDistanceView.setText(getShortenedTotalDistance(mTotalDistance));
                 }
@@ -96,8 +99,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 if (!mRunning) {
-                    mTotalDistance = 0;
-                    mDistanceView.setText("0m");
+                    resetView();
                     mChronometer.setBase(SystemClock.elapsedRealtime());
                     mChronometer.start();
                     mButton.setText(R.string.stop);
@@ -109,9 +111,18 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        //TODO: Speed calculation.
+        mChronometer.setOnChronometerTickListener(new Chronometer.OnChronometerTickListener() {
+            @Override
+            public void onChronometerTick(Chronometer chronometer) {
+                long secondsPassed = (SystemClock.elapsedRealtime() - chronometer.getBase())/1000;
+                if(secondsPassed != 0) {
+                   float avgSpeedInMps = mWalkedDistance / secondsPassed;
+                    mAvgSpeed = avgSpeedInMps * 3.6f;
+                    mSpeedView.setText(String.format("%.2f km/h", mAvgSpeed));
+                }
+            }
+        });
 
-        // Code referring to the share button listener.
         mShareButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -133,5 +144,12 @@ public class MainActivity extends AppCompatActivity {
             suffix = "km";
         }
         return String.format("%.2f%s", shortenedDistance, suffix);
+    }
+
+    private void resetView(){
+        mTotalDistance = 0;
+        mAvgSpeed = 0;
+        mDistanceView.setText("0m");
+        mSpeedView.setText("0 km/h");
     }
 }
