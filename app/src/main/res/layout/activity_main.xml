@@ -7,7 +7,7 @@
     tools:context="com.github.rafero1.correvai.MainActivity">
 
     <TextView
-        android:id="@+id/textView"
+        android:id="@+id/distanceView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="0m"
@@ -18,14 +18,14 @@
         app:layout_constraintTop_toTopOf="parent" />
 
     <Chronometer
-        android:id="@+id/chronometer2"
+        android:id="@+id/chronometer"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textSize="18sp"
         android:layout_marginBottom="16dp"
         android:layout_marginEnd="16dp"
         android:layout_marginStart="16dp"
-        app:layout_constraintBottom_toTopOf="@+id/textView"
+        app:layout_constraintBottom_toTopOf="@+id/distanceView"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
@@ -41,6 +41,22 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textView" />
+        app:layout_constraintTop_toBottomOf="@+id/distanceView" />
+
+    <ImageButton
+        android:id="@+id/shareButton"
+        android:layout_width="52dp"
+        android:layout_height="53dp"
+        android:layout_marginBottom="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:background="#00aaaaaa"
+        android:contentDescription="@string/share"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/button"
+        app:layout_constraintTop_toBottomOf="@+id/distanceView"
+        app:srcCompat="@android:drawable/ic_menu_share" />
 
 </android.support.constraint.ConstraintLayout>
