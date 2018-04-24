@@ -22,16 +22,14 @@ import com.kwabenaberko.openweathermaplib.Units;
 import com.kwabenaberko.openweathermaplib.implementation.OpenWeatherMapHelper;
 import com.kwabenaberko.openweathermaplib.models.currentweather.CurrentWeather;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public class MainActivity extends AppCompatActivity {
     //TODO: change to google play gps service
     // Permission array. Checks for all of these during onCreate.
     static final String[] PERMISSIONS = {
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION,
-            Manifest.permission.ACCESS_NETWORK_STATE
+            Manifest.permission.ACCESS_NETWORK_STATE,
+            Manifest.permission.INTERNET
     };
 
     LocationManager locationManager;
@@ -56,21 +54,15 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Request missing permissions on start
-        for (String permission : PERMISSIONS) {
-            List<String> requestsToMake = new ArrayList<>();
-            if (ActivityCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
-                requestsToMake.add(permission);
-            }
-            ActivityCompat.requestPermissions(this, requestsToMake.toArray(new String[PERMISSIONS.length]), 0);
-        }
-
         // Initialize View objects
         mDistanceView = findViewById(R.id.distanceView);
         mSpeedView = findViewById(R.id.speedView);
         mWeatherView = findViewById(R.id.weatherView);
         mChronometer = findViewById(R.id.chronometer);
         mButton = findViewById(R.id.button);
+
+        // Request permissions on start
+        ActivityCompat.requestPermissions(this, PERMISSIONS, 10);
 
         // Setup location tracking service
         criteria = new Criteria();
@@ -79,6 +71,9 @@ public class MainActivity extends AppCompatActivity {
             locationProvider = locationManager.getBestProvider(criteria, true);
 
             // Get last known location
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                return;
+            }
             lastKnownLocation = locationManager.getLastKnownLocation(locationProvider);
 
             // Start requesting updates with locationProvider and set listener. minTime and minDistance choose minimum time/distance between updates
@@ -138,8 +133,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        /*if (requestCode == 0) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                lastKnownLocation = locationManager.getLastKnownLocation(locationProvider);
+            }
+        }*/
     }
-
 
     public String getShortenedTotalDistance(float d) {
         String suffix = "m";
@@ -175,8 +174,8 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onStatusChanged(String s, int i, Bundle bundle) {
-                if (ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
-                        ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                if (ActivityCompat.checkSelfPermission(getBaseContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                        ActivityCompat.checkSelfPermission(getBaseContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                     return;
                 }
 
