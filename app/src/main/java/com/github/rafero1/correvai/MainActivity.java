@@ -129,20 +129,21 @@ public class MainActivity extends AppCompatActivity {
                     if (locationResult == null) {
                         return;
                     }
-                    if (mLastKnownLocation == null) {
-                        mLastKnownLocation = locationResult.getLastLocation();
+
+                    mLastKnownLocation = locationResult.getLastLocation();
+
+                    if (mPreviousKnownLocation == null)
                         mPreviousKnownLocation = mLastKnownLocation;
 
-                    } else if (mRunning) {
-                        mTotalDistance += mLastKnownLocation.distanceTo(mPreviousKnownLocation);
+                    if (mRunning) {
+                        mTotalDistance += mPreviousKnownLocation.distanceTo(mLastKnownLocation);
                         Log.d("LCT", "Distância total: " + String.valueOf(mTotalDistance));
                         mDistanceView.setText(getShortenedTotalDistance(mTotalDistance));
-                        mPreviousKnownLocation = mLastKnownLocation;
 
                     }
 
-                    mLastKnownLocation = locationResult.getLastLocation();
-                    float speed = (mLastKnownLocation.distanceTo(mPreviousKnownLocation)) / 3;
+                    mPreviousKnownLocation = mLastKnownLocation;
+                    float speed = (mPreviousKnownLocation.distanceTo(mLastKnownLocation)) / 5;
                     mLastKnownLocation.setSpeed(speed);
                     Log.d("TAG","Speed: "+String.valueOf(locationResult.getLastLocation().getSpeed()));
                 }
@@ -206,7 +207,7 @@ public class MainActivity extends AppCompatActivity {
 
     private LocationRequest createLocationRequest() {
         LocationRequest l = new LocationRequest();
-        l.setInterval(3000);
+        l.setInterval(5000);
         l.setFastestInterval(3000);
         l.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
         return l;
