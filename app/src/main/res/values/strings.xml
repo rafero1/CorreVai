@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Go!</string>
-    <string name="go">Vai!</string>
-    <string name="stop">Parar!</string>
-    <string name="share">Compartilhar</string>
-    <string name="OPEN_WEATHER_MAP_KEY">7259039250cdbce13168a48500c6fdc4</string>
-    <string name="connection_lost">Conexão falha.</string>
+    <string name="app_name">GoRun</string>
+    <string name="go">Run</string>
+    <string name="stop">Stop</string>
+    <string name="share">Share</string>
+    <string name="connection_lost">Connection lost.</string>
+    <string name="location_disabled">Enable permission</string>
+    <string name="temperature">Temperature</string>
 </resources>

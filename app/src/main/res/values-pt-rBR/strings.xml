@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GoRun</string>
+    <string name="go">Correr</string>
+    <string name="stop">Parar</string>
+    <string name="share">Compartilhar</string>
+    <string name="temperature">Temperatura</string>
+    <string name="connection_lost">Conexão falha.</string>
+    <string name="location_disabled">Dar permissão</string>
+</resources>

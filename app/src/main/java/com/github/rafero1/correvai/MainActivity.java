@@ -1,13 +1,11 @@
 package com.github.rafero1.correvai;
 
 import android.Manifest;
-import android.content.Context;
+import android.app.Activity;
 import android.content.pm.PackageManager;
-import android.location.Criteria;
 import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
 import android.os.Bundle;
+import android.os.CountDownTimer;
 import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
@@ -18,36 +16,43 @@ import android.widget.Button;
 import android.widget.Chronometer;
 import android.widget.TextView;
 
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
+import com.google.android.gms.location.LocationServices;
 import com.kwabenaberko.openweathermaplib.Units;
 import com.kwabenaberko.openweathermaplib.implementation.OpenWeatherMapHelper;
 import com.kwabenaberko.openweathermaplib.models.currentweather.CurrentWeather;
 
 public class MainActivity extends AppCompatActivity {
-    //TODO: change to google play gps service
-    // Permission array. Checks for all of these during onCreate.
-    static final String[] PERMISSIONS = {
+
+    // Permission array. Checks for all of these.
+    private static final String[] PERMISSIONS = {
             Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION,
             Manifest.permission.ACCESS_NETWORK_STATE,
             Manifest.permission.INTERNET
     };
+    public static final int PERMISSION_REQUEST_CODE = 10;
 
-    LocationManager locationManager;
-    String locationProvider;
-    Criteria criteria;
-    Location lastKnownLocation;
-    OpenWeatherMapHelper weatherMapHelper;
+    private OpenWeatherMapHelper weatherMapHelper;
+    private FusedLocationProviderClient mFusedLocationClient;
+    private LocationRequest mLocationRequest;
+    private LocationCallback mLocationCallback;
+    private Location mPreviousKnownLocation;
+    private Location mLastKnownLocation;
 
-    float mTotalDistance = 0;
-    boolean mRunning = false;
-    float mWalkedDistance = 0;
-    float mAvgSpeed = 0;
+    private float mTotalDistance = 0;
+    private boolean mCountingDown = false;
+    private boolean mRunning = false;
+    private float mAvgSpeed = 0;
 
-    TextView mDistanceView;
-    TextView mSpeedView;
-    TextView mWeatherView;
-    Chronometer mChronometer;
-    Button mButton;
+    private TextView mDistanceView;
+    private TextView mSpeedView;
+    private TextView mWeatherView;
+    private Chronometer mChronometer;
+    private Button mButton;
+    private CountDownTimer mCountDownTimer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,33 +67,157 @@ public class MainActivity extends AppCompatActivity {
         mButton = findViewById(R.id.button);
 
         // Request permissions on start
-        ActivityCompat.requestPermissions(this, PERMISSIONS, 10);
+        ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_REQUEST_CODE);
 
         // Setup location tracking service
-        criteria = new Criteria();
-        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        if (locationManager != null) {
-            locationProvider = locationManager.getBestProvider(criteria, true);
-
-            // Get last known location
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                return;
-            }
-            lastKnownLocation = locationManager.getLastKnownLocation(locationProvider);
-
-            // Start requesting updates with locationProvider and set listener. minTime and minDistance choose minimum time/distance between updates
-            locationManager.requestLocationUpdates(locationProvider, 0, 0, getLocationListener());
-        }
+        enableLocationServices();
 
         // Setup OpenWeatherMap helper class
         weatherMapHelper = new OpenWeatherMapHelper();
         weatherMapHelper.setApiKey(getString(R.string.OPEN_WEATHER_MAP_KEY));
         weatherMapHelper.setUnits(Units.METRIC);
-        weatherMapHelper.getCurrentWeatherByGeoCoordinates(lastKnownLocation.getLatitude(), lastKnownLocation.getLongitude(), new OpenWeatherMapHelper.CurrentWeatherCallback() {
 
+        // Chronometer Listener
+        mChronometer.setOnChronometerTickListener(new Chronometer.OnChronometerTickListener() {
+            @Override
+            public void onChronometerTick(Chronometer chronometer) {
+                long elapsedSeconds = (SystemClock.elapsedRealtime() - chronometer.getBase()) / 1000;
+                if (elapsedSeconds != 0) {/*
+                    float avgSpeedInMps = 999999999 / elapsedSeconds;
+                    mAvgSpeed = avgSpeedInMps * 3.6f;
+                    mSpeedView.setText(String.format("%.2f km/h", mAvgSpeed));*/
+                    mSpeedView.setText(String.format("%.2f km/h", mLastKnownLocation.getSpeed()* 3.6f));
+                }
+
+
+                if (elapsedSeconds == 0 || elapsedSeconds % 120 == 0)
+                    if (mLastKnownLocation != null)
+                        weatherMapHelper.getCurrentWeatherByGeoCoordinates(mLastKnownLocation.getLatitude(), mLastKnownLocation.getLongitude(), getWeatherCallbackListener());
+            }
+        });
+
+        // Run button timer
+        final int timeValue = 10000;
+        mCountDownTimer = new CountDownTimer(timeValue, 1000) {
+            public void onTick(long millisUntilFinished) {
+                if (mCountingDown) {
+                    mButton.setText(String.valueOf((millisUntilFinished) / 1000));
+                }
+            }
+
+            public void onFinish() {
+                if (mCountingDown) {
+                    resetView();
+                    mCountingDown = false;
+                    mRunning = true;
+                    mChronometer.setBase(SystemClock.elapsedRealtime());
+                    mChronometer.start();
+                    mButton.setText(R.string.stop);
+                }
+            }
+        };
+    }
+
+    private void enableLocationServices(){
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+            mLocationRequest = createLocationRequest();
+
+            mLocationCallback = new LocationCallback() {
+                @Override
+                public void onLocationResult(LocationResult locationResult) {
+                    if (locationResult == null) {
+                        return;
+                    }
+                    if (mLastKnownLocation == null) {
+                        mLastKnownLocation = locationResult.getLastLocation();
+                        mPreviousKnownLocation = mLastKnownLocation;
+
+                    } else if (mRunning) {
+                        mTotalDistance += mLastKnownLocation.distanceTo(mPreviousKnownLocation);
+                        Log.d("LCT", "Distância total: " + String.valueOf(mTotalDistance));
+                        mDistanceView.setText(getShortenedTotalDistance(mTotalDistance));
+                        mPreviousKnownLocation = mLastKnownLocation;
+
+                    }
+
+                    mLastKnownLocation = locationResult.getLastLocation();
+                    float speed = (mLastKnownLocation.distanceTo(mPreviousKnownLocation)) / 3;
+                    mLastKnownLocation.setSpeed(speed);
+                    Log.d("TAG","Speed: "+String.valueOf(locationResult.getLastLocation().getSpeed()));
+                }
+            };
+
+            mFusedLocationClient.requestLocationUpdates(mLocationRequest, mLocationCallback, null);
+
+            mButton.setText(R.string.go);
+            mButton.setOnClickListener(getOnButtonClickListener(this, true));
+
+    } else {
+            mButton.setText(R.string.location_disabled);
+            mButton.setOnClickListener(getOnButtonClickListener(this, false));
+        }
+    }
+
+    private View.OnClickListener getOnButtonClickListener(final Activity activity, boolean hasPermission){
+        if (hasPermission){
+            return new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    if (mRunning) {
+                        mChronometer.stop();
+                        mButton.setText(R.string.go);
+                        mRunning = false;
+
+                    } else {
+                        if (mCountingDown) {
+                            mCountDownTimer.cancel();
+                            mButton.setText(R.string.go);
+                            mCountingDown = false;
+
+                        } else {
+                            mCountDownTimer.start();
+                            mCountingDown = true;
+
+                        }
+                    }
+                }
+            };
+        } else {
+            return new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    ActivityCompat.requestPermissions(activity, PERMISSIONS, PERMISSION_REQUEST_CODE);
+                }
+            };
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        // Starts location services if permission were granted
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                enableLocationServices();
+            }
+        }
+    }
+
+    private LocationRequest createLocationRequest() {
+        LocationRequest l = new LocationRequest();
+        l.setInterval(3000);
+        l.setFastestInterval(3000);
+        l.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+        return l;
+    }
+
+    private OpenWeatherMapHelper.CurrentWeatherCallback getWeatherCallbackListener(){
+        OpenWeatherMapHelper.CurrentWeatherCallback c = new OpenWeatherMapHelper.CurrentWeatherCallback() {
             @Override
             public void onSuccess(CurrentWeather currentWeather) {
-                mWeatherView.setText(currentWeather.getMain().getTemp() + " °C");
+                String temperature = getString(R.string.temperature);
+                mWeatherView.setText(temperature+ ": " +currentWeather.getMain().getTemp()+ " °C");
             }
 
             @Override
@@ -96,48 +225,8 @@ public class MainActivity extends AppCompatActivity {
                 mWeatherView.setText(R.string.connection_lost);
             }
 
-        });
-
-        // View listeners
-        mButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (!mRunning) {
-                    resetView();
-                    mChronometer.setBase(SystemClock.elapsedRealtime());
-                    mChronometer.start();
-                    mButton.setText(R.string.stop);
-                } else {
-                    mChronometer.stop();
-                    mButton.setText(R.string.go);
-                }
-                mRunning = !mRunning;
-            }
-        });
-
-        mChronometer.setOnChronometerTickListener(new Chronometer.OnChronometerTickListener() {
-            @Override
-            public void onChronometerTick(Chronometer chronometer) {
-                long secondsPassed = (SystemClock.elapsedRealtime() - chronometer.getBase()) / 1000;
-                if (secondsPassed != 0) {
-                    float avgSpeedInMps = mWalkedDistance / secondsPassed;
-                    mAvgSpeed = avgSpeedInMps * 3.6f;
-                    mSpeedView.setText(String.format("%.2f km/h", mAvgSpeed));
-                }
-            }
-        });
-
-    }
-
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        /*if (requestCode == 0) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                lastKnownLocation = locationManager.getLastKnownLocation(locationProvider);
-            }
-        }*/
+        };
+        return c;
     }
 
     public String getShortenedTotalDistance(float d) {
@@ -150,54 +239,11 @@ public class MainActivity extends AppCompatActivity {
         return String.format("%.2f%s", shortenedDistance, suffix);
     }
 
-
     private void resetView() {
         mTotalDistance = 0;
         mAvgSpeed = 0;
         mDistanceView.setText("0m");
         mSpeedView.setText("0 km/h");
     }
-
-
-    // Listeners
-    private LocationListener getLocationListener() {
-        LocationListener l = new LocationListener() {
-            @Override
-            public void onLocationChanged(Location location) {
-                if (mRunning) {
-                    mWalkedDistance = lastKnownLocation.distanceTo(location);
-                    mTotalDistance += mWalkedDistance;
-                    Log.d("LCT", "Distância total: " + String.valueOf(mTotalDistance));
-                    mDistanceView.setText(getShortenedTotalDistance(mTotalDistance));
-                }
-            }
-
-            @Override
-            public void onStatusChanged(String s, int i, Bundle bundle) {
-                if (ActivityCompat.checkSelfPermission(getBaseContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
-                        ActivityCompat.checkSelfPermission(getBaseContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                    return;
-                }
-
-                locationProvider = locationManager.getBestProvider(criteria, true);
-                lastKnownLocation = locationManager.getLastKnownLocation(locationProvider);
-            }
-
-            @Override
-            public void onProviderEnabled(String s) {
-                //
-            }
-
-            @Override
-            public void onProviderDisabled(String s) {
-                //
-            }
-        };
-        return l;
-    }
-
-    //TODO: private Chronometer.OnChronometerTickListener
-
-    //TODO: private Button.OnClickListener
 
 }
